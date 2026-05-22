@@ -13,17 +13,25 @@
 // =========================================================================
 #define WIFI_SSID "Formiga"
 #define WIFI_PASSWORD "Gatos07."
+
+//---- Informações do banco, não mudar -----
 #define API_KEY "AIzaSyCzB9FvqwWxcbFKA2oYgHmrA8KRd5CWiYY" // Sua chave
-#define DATABASE_URL "portagatoiot-default-rtdb.firebaseio.com" 
+#define DATABASE_URL "portagatoiot-default-rtdb.firebaseio.com"
 
 // Tag autorizada (Deixe em branco na 1ª vez, leia no Serial Monitor e cole aqui depois) (depois colar a tag ali, no momento vai ser teste)
-String TAG_GATO = "GATO_SIMULADO"; 
+String TAG_GATO = "GATO_SIMULADO";
 
 // =========================================================================
 // 2. DEFINIÇÃO DE PINOS DO ESP32
 // =========================================================================
+
+// do Leitor RFID RC522
+#define MISO_PIN 5
+#define MOSI_PIN 18
+#define SCK_PIN 19
 #define RST_PIN 22        // Pino RST do Leitor RFID RC522
 #define SS_PIN 21         // Pino SDA/SS do Leitor RFID RC522
+
 #define SERVO_PIN 13      // Pino de controle do Servo Motor (Fio Laranja/Amarelo)
 #define LDR_PIN 34        // Pino Analógico do Sensor de Luminosidade
 #define SENSOR_IN_PIN 25  // Sensor Infravermelho 1 (Dentro de casa)
@@ -31,10 +39,6 @@ String TAG_GATO = "GATO_SIMULADO";
 #define LED_PIN 32        // Pino do LED de sinalização
 #define BUZZER_PIN 33     // Pino do Buzzer
 
-// do Leitor RFID RC522
-// MISO pino D5
-// MOSI pino D18
-// SCK pino D19
 
 // =========================================================================
 // 3. INSTÂNCIAS E OBJETOS
@@ -48,33 +52,35 @@ Servo travaServo;
 WiFiUDP ntpUDP;
 
 // Fuso horário UTC-3 (Brasil) = -3 horas * 3600 segundos = -10800
-NTPClient timeClient(ntpUDP, "pool.ntp.org", -10800); 
+NTPClient timeClient(ntpUDP, "pool.ntp.org", -10800);
 
 // =========================================================================
 // SETUP (Configuração Inicial)
 // =========================================================================
-void setup() {
+void setup()
+{
   Serial.begin(115200);
-  
+
   // Configura os pinos de entrada e saída
   pinMode(SENSOR_IN_PIN, INPUT);
   pinMode(SENSOR_OUT_PIN, INPUT);
   pinMode(LDR_PIN, INPUT);
   pinMode(LED_PIN, OUTPUT);
   pinMode(BUZZER_PIN, OUTPUT);
-  
+
   // Configura o Motor e fecha a porta (Ângulo 0)
   travaServo.attach(SERVO_PIN);
-  travaServo.write(0); 
+  travaServo.write(0);
 
   // Inicia a comunicação com o Leitor RFID
-  SPI.begin();
+  SPI.begin(SCK_PIN, MISO_PIN, MOSI_PIN);
   rfid.PCD_Init();
 
   // Conecta ao Wi-Fi
   Serial.print("Conectando ao WiFi...");
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-  while (WiFi.status() != WL_CONNECTED) {
+  while (WiFi.status() != WL_CONNECTED)
+  {
     Serial.print(".");
     delay(500);
   }
@@ -87,11 +93,14 @@ void setup() {
   Serial.println("Conectando ao Firebase...");
   config.api_key = API_KEY;
   config.database_url = DATABASE_URL;
-  
+
   // Como o banco está em modo teste, logamos anonimamente
-  if (Firebase.signUp(&config, &auth, "", "")) {
+  if (Firebase.signUp(&config, &auth, "", ""))
+  {
     Serial.println("Firebase Autorizado com Sucesso!");
-  } else {
+  }
+  else
+  {
     Serial.printf("Erro no Firebase: %s\n", config.signer.signupError.message.c_str());
   }
 
@@ -103,32 +112,37 @@ void setup() {
 // =========================================================================
 // LOOP PRINCIPAL
 // =========================================================================
-void loop() {
+void loop()
+{
   // Atualiza a hora via internet
   timeClient.update();
 
   // ---------------------------------------------------------
   // 1. MODO DE TESTE PELO MONITOR SERIAL (Sem a Tag Física)
   // ---------------------------------------------------------
-  if (Serial.available() > 0) {
+  if (Serial.available() > 0)
+  {
     String comando = Serial.readStringUntil('\n'); // Lê o que você digitou
-    comando.trim(); // Remove espaços ocultos
+    comando.trim();                                // Remove espaços ocultos
 
-    if (comando == "TESTE" || comando == "teste") {
+    if (comando == "TESTE" || comando == "teste")
+    {
       Serial.println("\n=============================");
       Serial.println("[SIMULAÇÃO] Comando de teste recebido via Serial!");
       // Finge que leu a tag correta e chama a função principal
-      processarAcesso(); 
+      processarAcesso();
     }
   }
 
   // ---------------------------------------------------------
   // 2. MODO REAL (Para quando a Tag e o Leitor chegarem)
   // ---------------------------------------------------------
-  if (rfid.PICC_IsNewCardPresent() && rfid.PICC_ReadCardSerial()) {
-    
+  if (rfid.PICC_IsNewCardPresent() && rfid.PICC_ReadCardSerial())
+  {
+
     String uidLido = "";
-    for (byte i = 0; i < rfid.uid.size; i++) {
+    for (byte i = 0; i < rfid.uid.size; i++)
+    {
       uidLido += String(rfid.uid.uidByte[i] < 0x10 ? "0" : "");
       uidLido += String(rfid.uid.uidByte[i], HEX);
     }
@@ -136,31 +150,40 @@ void loop() {
     Serial.println("\n=============================");
     Serial.println("TAG DETECTADA: " + uidLido);
 
-    if (uidLido == TAG_GATO) {
+    if (uidLido == TAG_GATO)
+    {
       processarAcesso();
-    } else {
+    }
+    else
+    {
       Serial.println("Acesso Negado: Gato desconhecido.");
       apitarErro();
     }
-    
-    delay(3000); 
+
+    delay(3000);
   }
 }
 
 // =========================================================================
 // LÓGICA DE NEGÓCIO E FUNÇÕES AUXILIARES
 // =========================================================================
-void processarAcesso() {
+void processarAcesso()
+{
   // 1. Descobrir a direção lendo os sensores infravermelhos
   // Lógica simples: se o sensor de dentro estiver bloqueado, ele quer sair.
   String direcao = "indefinido";
-  if (digitalRead(SENSOR_IN_PIN) == LOW) {
+  if (digitalRead(SENSOR_IN_PIN) == LOW)
+  {
     direcao = "saindo";
-  } else if (digitalRead(SENSOR_OUT_PIN) == LOW) {
+  }
+  else if (digitalRead(SENSOR_OUT_PIN) == LOW)
+  {
     direcao = "entrando";
-  } else {
+  }
+  else
+  {
     // Se nenhum sensor disparar, assumimos que ele quer entrar por segurança
-    direcao = "entrando"; 
+    direcao = "entrando";
   }
 
   // 2. Toque de Recolher (Horário de Bloqueio)
@@ -168,48 +191,56 @@ void processarAcesso() {
   bool acessoPermitido = true;
 
   // Bloqueia a saída entre 22h e 5h59
-  if (horaAtual >= 22 || horaAtual < 6) {
-    if (direcao == "saindo") {
+  if (horaAtual >= 22 || horaAtual < 6)
+  {
+    if (direcao == "saindo")
+    {
       acessoPermitido = false;
       Serial.println("Acesso Negado: Horário de recolher ativo! Gato não pode sair.");
     }
   }
 
   // 3. Executa a Ação
-  if (acessoPermitido) {
+  if (acessoPermitido)
+  {
     abrirPorta();
     enviarDadosFirebase(direcao);
-  } else {
+  }
+  else
+  {
     apitarErro();
   }
 }
 
-void abrirPorta() {
+void abrirPorta()
+{
   Serial.println("Acesso Permitido! Abrindo a porta...");
-  
+
   // Liga o LED e faz um bipe curto
   digitalWrite(LED_PIN, HIGH);
   digitalWrite(BUZZER_PIN, HIGH);
   delay(200);
   digitalWrite(BUZZER_PIN, LOW);
-  
+
   // Gira o Servo para 90 graus (abre a trava)
-  travaServo.write(90); 
-  
+  travaServo.write(90);
+
   // Mantém aberto por 5 segundos
-  delay(5000); 
-  
+  delay(5000);
+
   // Retorna o Servo para 0 graus (fecha a trava)
   travaServo.write(0);
-  
+
   // Desliga o LED
   digitalWrite(LED_PIN, LOW);
   Serial.println("Porta fechada.");
 }
 
-void apitarErro() {
+void apitarErro()
+{
   // Emite 3 bipes rápidos indicando erro/bloqueio
-  for(int i = 0; i < 3; i++) {
+  for (int i = 0; i < 3; i++)
+  {
     digitalWrite(BUZZER_PIN, HIGH);
     delay(150);
     digitalWrite(BUZZER_PIN, LOW);
@@ -217,10 +248,11 @@ void apitarErro() {
   }
 }
 
-void enviarDadosFirebase(String direcao) {
+void enviarDadosFirebase(String direcao)
+{
   // Lê a luminosidade analógica (0 a 4095 no ESP32)
   int nivelLuz = analogRead(LDR_PIN);
-  
+
   // Prepara o pacote de dados (JSON)
   FirebaseJson json;
   json.set("tag_gato", TAG_GATO);
@@ -231,9 +263,12 @@ void enviarDadosFirebase(String direcao) {
 
   // Envia para o banco de dados na coleção "historico_eventos"
   Serial.print("Enviando dados para o Firebase... ");
-  if (Firebase.RTDB.pushJSON(&fbdo, "/historico_eventos", &json)) {
+  if (Firebase.RTDB.pushJSON(&fbdo, "/historico_eventos", &json))
+  {
     Serial.println("Sucesso!");
-  } else {
+  }
+  else
+  {
     Serial.println("Falha ao enviar: " + fbdo.errorReason());
   }
 }
