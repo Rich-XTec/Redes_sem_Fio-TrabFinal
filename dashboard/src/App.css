@@ -1,0 +1,79 @@
+body {
+  margin: 0;
+  font-family: Arial, Helvetica, sans-serif;
+  background: #f4f4f4;
+}
+
+.container {
+  max-width: 1000px;
+  margin: auto;
+  padding: 30px;
+}
+
+h1 {
+  margin-bottom: 30px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+.card {
+  background: white;
+
+  padding: 20px;
+
+  border-radius: 12px;
+
+  margin-bottom: 20px;
+
+  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.status {
+  margin-top: 10px;
+
+  font-size: 24px;
+
+  font-weight: bold;
+}
+
+.locked {
+  color: red;
+}
+
+.unlocked {
+  color: green;
+}
+
+button {
+  border: none;
+
+  padding: 12px 20px;
+
+  border-radius: 8px;
+
+  background: black;
+
+  color: white;
+
+  cursor: pointer;
+
+  font-size: 16px;
+}
+
+button:hover {
+  opacity: 0.8;
+}
+
+.event-item {
+  display: flex;
+
+  justify-content: space-between;
+
+  padding: 12px 0;
+
+  border-bottom: 1px solid #ddd;
+}
