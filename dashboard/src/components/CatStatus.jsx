@@ -6,7 +6,7 @@ function CatStatus({ inside }) {
       <h2>Status do Gato</h2>
 
       {inside === null ? (
-        <p>⚠️ Sensor ainda não implementado</p>
+        <p>⚠️ Aguardando dados do Firebase...</p>
       ) : inside ? (
         <div className="status unlocked">
           🟢 Dentro de casa

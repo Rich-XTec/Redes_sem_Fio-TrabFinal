@@ -24,16 +24,6 @@ function App() {
   useEffect(() => {
 
     //
-    // Escuta a última mensagem do ESP (ex: "saindo" / "entrando")
-    const catLastRef = ref(db, "cat_status/last");
-    onValue(catLastRef, (snapshot) => {
-      const val = snapshot.val();
-      if (val === "saindo") setCatInside(false);
-      else if (val === "entrando") setCatInside(true);
-      else if (typeof val === "boolean") setCatInside(val);
-      else setCatInside(null);
-    });
-
     // Histórico de eventos
     const eventsRef = ref(db, "historico_eventos");
 
@@ -43,6 +33,7 @@ function App() {
 
       if (!data) {
         setEvents([]);
+        setCatInside(null);
         return;
       }
 
@@ -53,7 +44,17 @@ function App() {
         })
       );
 
-      setEvents(formatted.reverse());
+      const reversed = formatted.reverse();
+      setEvents(reversed);
+
+      // Pega a última ação do histórico para determinar o status do gato
+      if (reversed.length > 0) {
+        const lastAction = reversed[0].acao;
+        if (lastAction === "saindo") setCatInside(false);
+        else if (lastAction === "entrando") setCatInside(true);
+        else setCatInside(null);
+        console.log("Última ação:", lastAction, "Status:", lastAction === "entrando");
+      }
 
     });
 
@@ -61,7 +62,9 @@ function App() {
     const lockedRef = ref(db, "door/locked");
 
     onValue(lockedRef, (snapshot) => {
-      setLocked(snapshot.val());
+      const val = snapshot.val();
+      console.log("door/locked valor:", val);
+      setLocked(val);
     });
 
     // Segurança noturna: configurações
