@@ -7,14 +7,15 @@
   Codigo para o funcionamento do circuito
   Não engloba a conexão wifi com o firebase.
 
-  Versão do codigo com 1 leitor RFID no externo e um SR501 Infra-Red Motion Sensor interno
+  Os modulos de conexão, Leitura e Escrita no firebase estão funcionando.
 
   Quando for fazer upload no esp, apertar o botão BOOT quando aparecer Connecting... no terminal
 */
 
 #define RST_PIN_1 4 // RST do RFID externo (fora)
 #define SS_PIN_1 5  // SDA do RFID externo (fora)
-#define PIR_PIN 14  // Motion Sensor interno (dentro)
+#define RST_PIN_2 27 // RST do RFID interno (dentro)
+#define SS_PIN_2 15 // SDA do RFID interno (dentro)
 #define SERVO_PIN 13
 #define LDR_PIN 34
 
@@ -36,7 +37,7 @@
 String TAG_GATO = "F306622D";
 
 MFRC522 rfidExterno(SS_PIN_1, RST_PIN_1);
-
+MFRC522 rfidInterno(SS_PIN_2, RST_PIN_2);
 Servo travaServo;
 
 bool portaAberta = false;
@@ -58,7 +59,7 @@ void conectarWIFI()
 void setup()
 {
   Serial.begin(115200);
-  Serial.println("\n=== PORTA GATO - 1x RFID & SR501 + SERVO + LDR ===");
+  Serial.println("\n=== PORTA GATO - 2x RFID + SERVO + LDR ===");
   Serial.println("\n=== INICIANDO SISTEMA DA PORTA ===");
 
   pinMode(LDR_PIN, INPUT);
@@ -71,12 +72,7 @@ void setup()
 
   // Desativa os dois SS antes de iniciar
   pinMode(SS_PIN_1, OUTPUT);
-
-  pinMode(PIR_PIN, INPUT);
-  Serial.println("[PIR] Sensor de movimento inicializado.");
-  Serial.println("[PIR] Aguardando estabilizacao...");
-  delay(60000);
-  Serial.println("[PIR] Sensor pronto.");
+  pinMode(SS_PIN_2, OUTPUT);
 
   // Configura o Servo e garante que a porta inicie trancada
   travaServo.attach(SERVO_PIN);
@@ -91,6 +87,12 @@ void setup()
   delay(50);
   Serial.println("[RFID-EXT] Leitor externo inicializado.");
   digitalWrite(SS_PIN_1, HIGH);
+
+  digitalWrite(SS_PIN_2, LOW);
+  rfidInterno.PCD_Init();
+  delay(50);
+  Serial.println("[RFID-INT] Leitor interno inicializado.");
+  digitalWrite(SS_PIN_2, HIGH);
 
   conectarWIFI();
 
@@ -177,36 +179,57 @@ void loop()
     delay(1000); // Pausa para evitar múltiplas leituras seguidas
   }
 
-  static bool movimentoAnterior = false;
+  // ---------------------------------------------------------
+  // 2. LEITURA DO LADO INTERNO (Gato querendo sair)
+  // ---------------------------------------------------------
 
-  bool movimentoAtual = digitalRead(PIR_PIN);
-
-  if (movimentoAtual && !movimentoAnterior)
+  if (rfidInterno.PICC_IsNewCardPresent() && rfidInterno.PICC_ReadCardSerial())
   {
-    Serial.println("[PIR] Movimento detectado no lado interno.");
-
-    // Verifica o toque de recolher
-    int horaAtual = obterHoraAtual();
-
-    if (horaAtual >= 22 || horaAtual < 6)
+    String uid = "";
+    for (byte i = 0; i < rfidInterno.uid.size; i++)
     {
-      Serial.println("[BLOQUEADO] Horario de recolher! O gato nao pode sair agora.");
+      uid += String(rfidInterno.uid.uidByte[i] < 0x10 ? "0" : "");
+      uid += String(rfidInterno.uid.uidByte[i], HEX);
+    }
+    uid.toUpperCase();
 
-      for (int i = 0; i < 3; i++)
+    Serial.print("\n[LEITURA] Tag detectada dentro: ");
+    Serial.println(uid);
+
+    // VALIDAÇÃO ESTRITA: Só entra no IF se for exatamente a TAG registrada
+    if (uid == TAG_GATO)
+    {
+      Serial.println("[AUTORIZADO] Tag reconhecida no leitor INTERNO.");
+
+      // Verifica a regra de horário (Toque de Recolher) antes de deixar sair
+      int horaAtual = obterHoraAtual();
+      if (horaAtual >= 22 || horaAtual < 6)
       {
-        digitalWrite(LED_VERMELHO, HIGH);
-        delay(200);
-        digitalWrite(LED_VERMELHO, LOW);
-        delay(200);
+        Serial.println("[BLOQUEADO] Horário de recolher! O gato não pode sair agora.");
+        // Pisca o led vermelho para indicar bloqueio
+        for (int i = 0; i < 3; i++)
+        {
+          digitalWrite(LED_VERMELHO, HIGH);
+          delay(200);
+          digitalWrite(LED_VERMELHO, LOW);
+          delay(200);
+        }
+      }
+      else
+      {
+        acionarPorta("saindo");
       }
     }
     else
     {
-      acionarPorta("saindo");
+      Serial.print("[NEGADO] Tag desconhecida tentou sair: ");
+      Serial.println(uid);
     }
-  }
 
-  movimentoAnterior = movimentoAtual;
+    rfidInterno.PICC_HaltA();
+    rfidInterno.PCD_StopCrypto1();
+    delay(1000);
+  }
 
   // Pequeno delay para estabilidade do ESP32 no loop
   delay(50);
