@@ -164,7 +164,24 @@ void loop()
     if (uid == TAG_GATO)
     {
       Serial.println("[AUTORIZADO] Tag reconhecida no leitor EXTERNO.");
-      acionarPorta("entrando");
+
+      // -> Verifica Política 1: A porta está travada no app?
+      if (isPortaTravada())
+      {
+        Serial.println("[BLOQUEADO] O modo 'LOCKED' esta ativado no Firebase. Acesso negado.");
+        // Pisca o LED vermelho indicando porta bloqueada
+        for (int i = 0; i < 3; i++)
+        {
+          digitalWrite(LED_VERMELHO, HIGH);
+          delay(200);
+          digitalWrite(LED_VERMELHO, LOW);
+          delay(200);
+        }
+      }
+      else
+      {
+        acionarPorta("entrando");
+      }
     }
     else
     {
@@ -177,6 +194,10 @@ void loop()
     delay(1000); // Pausa para evitar múltiplas leituras seguidas
   }
 
+  // ---------------------------------------------------------
+  // 2. LEITURA DO LADO INTERNO (Gato querendo sair - PIR)
+  // ---------------------------------------------------------
+
   static bool movimentoAnterior = false;
 
   bool movimentoAtual = digitalRead(PIR_PIN);
@@ -185,13 +206,11 @@ void loop()
   {
     Serial.println("[PIR] Movimento detectado no lado interno.");
 
-    // Verifica o toque de recolher
-    int horaAtual = obterHoraAtual();
-
-    if (horaAtual >= 22 || horaAtual < 6)
+    // -> Verifica Política 1: A porta está travada no app?
+    if (isPortaTravada())
     {
-      Serial.println("[BLOQUEADO] Horario de recolher! O gato nao pode sair agora.");
-
+      Serial.println("[BLOQUEADO] O modo 'LOCKED' esta ativado no Firebase. Acesso negado.");
+      // Pisca o LED vermelho indicando porta bloqueada
       for (int i = 0; i < 3; i++)
       {
         digitalWrite(LED_VERMELHO, HIGH);
@@ -202,7 +221,27 @@ void loop()
     }
     else
     {
-      acionarPorta("saindo");
+      // -> Verifica Política 2: O modo noturno (toque de recolher) está ativo?
+      bool modoNoturno = isModoNoturnoAtivo();
+      // Verifica o toque de recolher
+      int horaAtual = obterHoraAtual();
+
+      if (modoNoturno && (horaAtual >= 22 || horaAtual < 6))
+      {
+        Serial.println("[BLOQUEADO] Horario de recolher (night_enabled = true)! O gato nao pode sair agora.");
+
+        for (int i = 0; i < 3; i++)
+        {
+          digitalWrite(LED_VERMELHO, HIGH);
+          delay(200);
+          digitalWrite(LED_VERMELHO, LOW);
+          delay(200);
+        }
+      }
+      else
+      {
+        acionarPorta("saindo");
+      }
     }
   }
 

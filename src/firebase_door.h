@@ -76,6 +76,42 @@ String obterHorarioFormatado()
 }
 
 /**
+ * Lê no Firebase se a porta está trancada manualmente pelo app/banco.
+ * Caminho: /door/locked
+ */
+bool isPortaTravada()
+{
+  if (Firebase.getBool(fbdo, "/door/locked"))
+  {
+    return fbdo.boolData(); // Retorna o valor lido do banco
+  }
+  else
+  {
+    Serial.print("Erro ao ler /door/locked: ");
+    Serial.println(fbdo.errorReason());
+    return false; // Por padrão, se falhar a conexão, assume que NÃO está travada
+  }
+}
+
+/**
+ * Lê no Firebase se o bloqueio noturno de segurança está habilitado.
+ * Caminho: /security/night_enabled
+ */
+bool isModoNoturnoAtivo()
+{
+  if (Firebase.getBool(fbdo, "/security/night_enabled"))
+  {
+    return fbdo.boolData(); // Retorna o valor lido do banco
+  }
+  else
+  {
+    Serial.print("Erro ao ler /security/night_enabled: ");
+    Serial.println(fbdo.errorReason());
+    return true; // Por padrão, se falhar a conexão, mantemos o toque de recolher ativo por segurança
+  }
+}
+
+/**
  * Envia o pacote JSON com os eventos de acesso do gato.
  * O horário é capturado de forma automática e interna antes do envio.
  */
