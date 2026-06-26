@@ -22,16 +22,16 @@
 #define LED_VERMELHO 32 // Indicador de saída
 #define LED_VERDE 33    // Indicador de entrada
 
-#define SERVO_ABERTO 90
-#define SERVO_FECHADO 0
+#define SERVO_ABERTO 0
+#define SERVO_FECHADO 90
 #define TEMPO_PORTA_ABERTA 5000
 #define LDR_LIMIAR 2000
 
-#define WIFI_SSID "Jacare"
-#define WIFI_PASSWORD "semsal2023"
+// #define WIFI_SSID "Jacare"
+// #define WIFI_PASSWORD "semsal2023"
 
-// #define WIFI_SSID "Labdigitais"
-// #define WIFI_PASSWORD "labbom123"
+#define WIFI_SSID "Labdigitais"
+#define WIFI_PASSWORD "labbom123"
 
 String TAG_GATO = "F306622D";
 
